@@ -1,0 +1,16 @@
+jenkins:
+  container_name: jenkins
+  build: docker/jenkins
+  links:
+    - dind
+  ports:
+    - 8080:8080
+  
+dind:
+  container_name: dind
+  build: docker/dind
+  expose:
+    - 4242
+  environment:
+    PORT: 4242
+  privileged: true

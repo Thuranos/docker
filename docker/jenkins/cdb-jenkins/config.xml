@@ -1,0 +1,80 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description>Jenkins in a Docker that will create sother Docker in the dind Docker in order to unit test our computer database project.  </description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.17.1">
+      <projectUrl>https://github.com/Thuranos/Computer_Database.git/</projectUrl>
+      <displayName></displayName>
+    </com.coravy.hudson.plugins.github.GithubProjectProperty>
+  </properties>
+  <scm class="hudson.plugins.git.GitSCM" plugin="git@2.4.2">
+    <configVersion>2</configVersion>
+    <userRemoteConfigs>
+      <hudson.plugins.git.UserRemoteConfig>
+        <url>https://github.com/Thuranos/Computer_Database.git</url>
+      </hudson.plugins.git.UserRemoteConfig>
+    </userRemoteConfigs>
+    <branches>
+      <hudson.plugins.git.BranchSpec>
+        <name>*/master</name>
+      </hudson.plugins.git.BranchSpec>
+    </branches>
+    <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+    <submoduleCfg class="list"/>
+    <extensions/>
+  </scm>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers>
+    <com.cloudbees.jenkins.GitHubPushTrigger plugin="github@1.17.1">
+      <spec></spec>
+    </com.cloudbees.jenkins.GitHubPushTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>docker pull rlarroque/cdb_ut
+docker pull rlarroque/cdb_db
+
+#Stop and remove existing containers
+for container_id in $(docker ps --filter=&quot;name=cdb_ut&quot; -q);
+do docker stop $container_id &amp;&amp; docker rm $container_id;
+done
+
+for container_id in $(docker ps --filter=&quot;name=cdb_db&quot; -q);
+do docker stop $container_id &amp;&amp; docker rm $container_id;
+done
+
+for container_id in $(docker ps --filter=&quot;name=cdb_ut&quot; -q -a);
+do docker rm $container_id;
+done
+
+for container_id in $(docker ps --filter=&quot;name=cdb_db&quot; -q -a);
+do docker rm $container_id;
+done
+
+#Run mySQL container
+docker run --name cdb_db -e MYSQL_ROOT_PASSWORD=qwerty1234 -d rlarroque/cdb_db &amp;
+
+sleep 10
+
+#Create unit test container
+docker create --name cdb_ut --link cdb_db rlarroque/cdb_ut
+
+#Copy the workspace to test in the previously created container and override the database.properties
+docker cp /var/jenkins_home/jobs/cdb-jenkins/workspace/ cdb_ut:/opt/test
+docker cp /opt/database.properties cdb_ut:/opt/test/computer_database/src/test/resources/database.properties
+
+#Start the unit test container
+docker start -a cdb_ut
+
+</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>
