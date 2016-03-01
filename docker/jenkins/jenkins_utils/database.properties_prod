@@ -1,0 +1,3 @@
+datasource.url = jdbc:mysql://172.18.0.2:3306/prod_database?zeroDateTimeBehavior=convertToNull
+datasource.username = admincdb
+datasource.password = qwerty1234

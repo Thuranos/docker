@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <project>
   <actions/>
-  <description>Jenkins in a Docker that will create sother Docker in the dind Docker in order to unit test our computer database project.  </description>
+  <description>Jenkins in a Docker that will create other Docker in the dind Docker in order to unit test our computer database project.  </description>
   <keepDependencies>false</keepDependencies>
   <properties>
     <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.17.1">
@@ -40,30 +40,30 @@
       <command>docker pull rlarroque/cdb_ut
 docker pull rlarroque/cdb_db
 
-#Stop and remove existing containers
-for container_id in $(docker ps --filter=&quot;name=cdb_ut&quot; -q);
-do docker stop $container_id &amp;&amp; docker rm $container_id;
+#Stop existing containers
+for container_id in $(docker ps --filter="name=cdb_ut" -q);
+do docker stop $container_id;
 done
 
-for container_id in $(docker ps --filter=&quot;name=cdb_db&quot; -q);
-do docker stop $container_id &amp;&amp; docker rm $container_id;
+for container_id in $(docker ps --filter="name=cdb_db" -q);
+do docker stop $container_id;
 done
 
-for container_id in $(docker ps --filter=&quot;name=cdb_ut&quot; -q -a);
-do docker rm $container_id;
-done
+#If db container doesn'tcd  already exist, create it
+if ! [ -e $(docker ps -aq -f "cdb_db") ]
+then 
+	docker create --name=cdb_db -e MYSQL_ROOT_PASSWORD=qwerty1234 rlarroque/cdb_db
+fi
 
-for container_id in $(docker ps --filter=&quot;name=cdb_db&quot; -q -a);
-do docker rm $container_id;
-done
+#Start db test and wait a bit cause mySQL is slow as f*ck
+docker start cdb_db
+sleep 5
 
-#Run mySQL container
-docker run --name cdb_db -e MYSQL_ROOT_PASSWORD=qwerty1234 -d rlarroque/cdb_db &amp;
-
-sleep 10
-
-#Create unit test container
-docker create --name cdb_ut --link cdb_db rlarroque/cdb_ut
+#If ut container doesn't already exist, create it
+if ! [ -e $(docker ps -aq -f "cdb_ut") ]
+then 
+	docker create --name cdb_ut --link cdb_db rlarroque/cdb_ut
+fi
 
 #Copy the workspace to test in the previously created container and override the database.properties
 docker cp /var/jenkins_home/jobs/cdb-jenkins/workspace/ cdb_ut:/opt/test
@@ -71,6 +71,15 @@ docker cp /opt/database.properties cdb_ut:/opt/test/computer_database/src/test/r
 
 #Start the unit test container
 docker start -a cdb_ut
+docker stop cdb_db
+
+#Retrieve the war and deploy it
+docker cp cdb_ut:/opt/test/computer_database/target/computer_database.war /opt/deployment/webapp.war
+docker build -t rlarroque/cdb_webapp /opt/deployment
+docker push rlarroque/cdb_webapp
+
+bash /opt/deployment/glazer-deploy.sh --host 192.168.10.225 --port 65000 --env MYSQL_ROOT_PASSWORD=qwerty1234 rlarroque_cdb_db rlarroque/cdb_db_prod
+bash /opt/deployment/glazer-deploy.sh --host 192.168.10.225 --port 65000 --link rlarroque_cdb_db:localhost --publish 65175:8080 rlarroque_cdb_webapp rlarroque/cdb_webapp
 
 </command>
     </hudson.tasks.Shell>
